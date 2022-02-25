@@ -1,17 +1,16 @@
----
 
 <div align="center">
-<p> Fast Deformable Linear Objects Instance Segmentation and Modelling </p>
+<h2> Fast Deformable Linear Objects Instance Segmentation and Modelling </h2>
 </div>
 
-# Abstract
+### Abstract
 In this paper, an approach for fast and accurate segmentation of Deformable Linear Objects (DLOs) named FASTDLO is presented.  
 A deep convolutional neural network is employed for background segmentation, generating a binary mask that isolates DLOs in the image. Thereafter, the obtained mask is processed with a skeletonization algorithm and the intersections between different DLOs are solved with a Similarity-based network. In addition to the usual pixel-wise color-mapped image, FASTDLO also provides a spline model in 2D coordinates for each detected DLO. Synthetically generated data are exploited for the training of the data-driven methods, avoiding expensive annotations of real data. FASTDLO is experimentally compared against both a DLO-specific segmentation approach and general-purpose deep learning instance segmentation models, achieving better overall performances and a processing rate higher than 20 FPS. 
 
 *Currently under review at Robotics and Automation Letters (RAL)*
 
 
-# Installation
+### Installation
 
 Main dependencies:
 
@@ -30,12 +29,12 @@ Installation (from inside the main project directory):
 pip install .
 ```
 
-# Models' weights
+### Models' weights
 
 Download the [weights](https://drive.google.com/file/d/1_50g28B78R01ZW4_v4Gc6baQyiG-1pVE/view?usp=sharing) and place them inside a ```weights``` folder.
 
 
-# Usage
+### Usage
 
 import as a standard python package with ```from fastdlo.core import Pipeline```.
 
