@@ -40,7 +40,7 @@ def getColors(colormap_name = "Set1", number = 10):
     return [(colors(i)[0] * 255, colors(i)[1] * 255, colors(i)[2] * 255)  for i in range(20)]
 
 
-def samplePaths(paths, density=10, drop_endpoints=True, n_min_path=3):
+def samplePaths(paths, density=10, drop_endpoints=False, n_min_path=5):
     #vertices, edges = [], []
     excluded = []
     vertices_dict = {}
@@ -138,7 +138,7 @@ def computeSpline(points, num_points = 10, k = 3, s = 0.0):
     return np.column_stack((x_,y_)), np.column_stack((xd_,yd_)), np.column_stack((xdd_,ydd_))
 
 
-def roundRadius(radius, mul=1.0, bound=5):
+def roundRadius(radius, mul=1.0, bound=6):
     r = int(np.ceil(radius*mul))
     if r < bound: 
         r = bound
@@ -146,6 +146,8 @@ def roundRadius(radius, mul=1.0, bound=5):
 
 
 def colorMasks(splines, shape, mask_input=None):
+    colors_k = [i for i in range(10)]
+    colors_k_excl = [i for i in range(10) if i not in list(splines.keys())]
     colors = COLORS
     if mask_input is None:
         mask = np.zeros((shape[0], shape[1]), dtype=np.uint8)
@@ -155,16 +157,30 @@ def colorMasks(splines, shape, mask_input=None):
     
     for k, v in splines.items():
         #t0 = arrow.utcnow()
+        if k in colors_k:
+            c = (int(colors(k)[0]*255), int(colors(k)[1]*255), int(colors(k)[2]*255))
+            colors_k.remove(k)
+        else:
+            if colors_k_excl:
+                rand_k = np.random.choice(colors_k_excl)
+                c = (int(colors(rand_k)[0]*255), int(colors(rand_k)[1]*255), int(colors(rand_k)[2]*255))
+                colors_k.remove(rand_k)
+                colors_k_excl.remove(rand_k)
+            else:
+                c = (127,127,127)
 
-        r = roundRadius(v["radius"])
-        c = (int(colors(k)[0]*255), int(colors(k)[1]*255), int(colors(k)[2]*255))
+
+        r = roundRadius(v["radius"])  
+
         for p in splines[k]["points"]:
             cv2.circle(mask, (int(p[1]), int(p[0])), r, c, -1)
 
-        if True:
+        if False:
             new_points = splineExtension(splines[k]["points"], shape=mask.shape[:2])
             for p in new_points:
-                cv2.circle(mask, (int(p[1]), int(p[0])), r, c, -1)
+                p = (int(p[1]), int(p[0]))
+                if np.sum(mask[p[1], p[0]]) == 0:
+                    cv2.circle(mask, p, r, c, -1)
 
         #print("coloring {0}, time: {1:.4f} ms".format(k, (arrow.utcnow() - t0).total_seconds() * 1000))
 

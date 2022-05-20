@@ -30,7 +30,7 @@ class SegNet():
         logging.info(f'Using device {self.device}')
 
         checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.load_state_dict(checkpoint)
         self.model.to(self.device)
 
         logging.info("Model loaded !")

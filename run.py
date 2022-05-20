@@ -1,30 +1,35 @@
-from fastdlo.core import Pipeline
-import os, cv2
-import argparse
+import os, sys, cv2, arrow
+import numpy as np
+from termcolor import cprint
 
-parser = argparse.ArgumentParser(description='FASTDLO: Fast Deformable Linear Objects Instance Segmentation and Modelling')
-parser.add_argument('--img', required=True, help='source image path to process')
-parser.add_argument('--img_w', default=640, type=int, help='image width')
-parser.add_argument('--img_h', default=360, type=int, help='image height')
-parser.add_argument('--ckpt_seg', default="CP_segmentation.pth", help='name checkpoint segmentation network')
-parser.add_argument('--ckpt_siam', default="CP_similarity.pth", help='name checkpoint similarity network')
-args = parser.parse_args()
+from fastdlo.core import Pipeline
 
 
 if __name__ == "__main__":
 
+    ######################
+    IMG_PATH = "/home/lar/Documents/fast_dlo_segmentation/images/c1_9.jpg"
+    ckpt_siam_name = "CP_similarity.pth"
+    ckpt_seg_name = "CP_segmentation.pth"
+    IMG_W = 640
+    IMG_H = 360
+    ######################
+
     script_path = os.path.dirname(os.path.realpath(__file__))
-    checkpoint_sim = os.path.join(script_path, "weights/" + args.ckpt_siam)
-    checkpoint_seg = os.path.join(script_path, "weights/" + args.ckpt_seg)
+    checkpoint_siam = os.path.join(script_path, "weights/" + ckpt_siam_name)
+    checkpoint_seg = os.path.join(script_path, "weights/" + ckpt_seg_name)
+    
 
-    p = Pipeline(checkpoint_siam=checkpoint_sim, checkpoint_seg=checkpoint_seg, img_w=args.img_w, img_h=args.img_h)
- 
-    source_img = cv2.imread(args.img, cv2.IMREAD_COLOR)
-    source_img = cv2.resize(source_img, (args.img_w, args.img_h))
+    p = Pipeline(checkpoint_siam=checkpoint_siam, checkpoint_seg=checkpoint_seg, img_w=IMG_W, img_h=IMG_H)
 
-    img_out = p.run(source_img=source_img)
+    # COLOR
+    source_img = cv2.imread(IMG_PATH, cv2.IMREAD_COLOR)
+    source_img = cv2.resize(source_img, (IMG_W, IMG_H))
 
-    conc = cv2.hconcat([source_img, img_out])
-    cv2.imshow("output", conc)
+    img_out, _ = p.run(source_img=source_img, mask_th=77)
+
+    canvas = source_img.copy()
+    canvas = cv2.addWeighted(canvas, 1.0, img_out, 0.8, 0.0)
+    cv2.imshow("output", canvas)
     cv2.waitKey(0)
 

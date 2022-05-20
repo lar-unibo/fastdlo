@@ -4,10 +4,10 @@ import arrow
 import matplotlib.pyplot as plt
 from termcolor import cprint 
 
-from fastdlo.sim_net.predict import NN
+from fastdlo.siam_net.nn_predict import NN
 from fastdlo.seg_net.predict import SegNet
 
-from fastdlo.sim_net.dataset import PredictData
+from fastdlo.siam_net.nn_dataset import AriadnePredictData
 from fastdlo.proc.labelling import LabelsPred
 import fastdlo.proc.utils as utils
 
@@ -26,34 +26,44 @@ class Pipeline():
             self.network_seg = None
 
 
-    def run(self, source_img):
+    def run(self, source_img, mask_th = 127):
+        t0 = arrow.utcnow()
 
         # MASK
         mask_img = self.network_seg.predict_img(source_img)
-        mask_img[mask_img > 127] = 255
+
+        mask_img[mask_img > mask_th] = 255
         mask_img[mask_img != 255] = 0
-        mask_img = cv2.morphologyEx(mask_img, cv2.MORPH_CLOSE, np.ones((3,3), dtype=np.uint8))
+        #mask_img = cv2.morphologyEx(mask_img, cv2.MORPH_CLOSE, np.ones((3,3), dtype=np.uint8))
 
-        img_out = self.process(source_img=source_img, mask_img=mask_img)
+        seg_time = (arrow.utcnow() - t0).total_seconds() * 1000
 
-        return img_out
+        img_out, times = self.process(source_img=source_img, mask_img=mask_img, mask_th=mask_th)
+
+        times["seg_time"] = seg_time
+
+        return img_out, times
 
 
 
-    def process(self, source_img, mask_img):
+    def process(self, source_img, mask_img, mask_th=127):
 
+        t0 = arrow.utcnow() #####################
 
         # PRE-PROCESSING
         lp = LabelsPred()
-        rv = lp.compute(source_img=source_img, mask_img=mask_img, timings=False, mask_threshold=127)
+        rv = lp.compute(source_img=source_img, mask_img=mask_img, timings=False, mask_threshold=mask_th)
         nodes, single_nodes, pred_edges, vertices_dict, radius_dict, ints_dict  = \
             rv["nodes"], rv["single_nodes"], rv["pred_edges"], rv["vertices"], rv["radius"], rv["intersections"]
         
         data_dict = {"nodes": nodes, "pred_edges_index": pred_edges}
 
+        pre_time = (arrow.utcnow() - t0).total_seconds() * 1000
+        #cprint("time pre-processing: {0:.4f} ms".format((arrow.utcnow() - t0).total_seconds() * 1000), "yellow")
+
 
         # PATHS PREDICTION FOR PRED_EDGES AND NN
-        paths_final, vertices_dict_excluded, preds_sorted, _ = self.predictAndMerge(data_dict, vertices_dict, radii_dict=radius_dict)
+        paths_final, vertices_dict_excluded, preds_sorted, pred_time = self.predictAndMerge(data_dict, vertices_dict, radii_dict=radius_dict)
 
 
         # TRYING TO MERGE EXCLUDED SEGMENTS
@@ -68,7 +78,7 @@ class Pipeline():
             #print("pred_edges_2: ", pred_edges_2)
             data_dict2 = {"nodes": nodes, "pred_edges_index": pred_edges_2}
  
-            paths_final_2, vertices_dict_excluded_2, preds_sorted_2, _ = self.predictAndMerge(data_dict2, vertices_dict_excluded, radii_dict=radius_dict)
+            paths_final_2, vertices_dict_excluded_2, preds_sorted_2, pred_time_2 = self.predictAndMerge(data_dict2, vertices_dict_excluded, radii_dict=radius_dict)
 
             # merge the two dicts
             paths_last_key = len(paths_final.keys())
@@ -82,11 +92,8 @@ class Pipeline():
                     paths_final[paths_last_key + k] = {"points": v["pos"], "radius": radius_dict[k]}  
 
 
-            preds_all_out = []
-            for p in preds_sorted:
-                preds_all_out.append((p["node_0"], p["node_1"], p["score"]))
-            for p in preds_sorted_2:
-                preds_all_out.append((p["node_0"], p["node_1"], p["score"]))
+            preds_all_out = [(p["node_0"], p["node_1"], p["score"]) for p in preds_sorted]
+            preds_all_out.extend([(p["node_0"], p["node_1"], p["score"]) for p in preds_sorted_2])
 
         else:
             # considering excluded paths
@@ -97,9 +104,7 @@ class Pipeline():
                     paths_final[paths_last_key + counter] = {"points": v["pos"], "radius": radius_dict[k]}   
                     counter += 1
 
-            preds_all_out = []
-            for p in preds_sorted:
-                preds_all_out.append((p["node_0"], p["node_1"], p["score"]))
+            preds_all_out = [(p["node_0"], p["node_1"], p["score"]) for p in preds_sorted]
 
 
         # SPLINES FOR MODELLING DLOS
@@ -107,22 +112,34 @@ class Pipeline():
 
         ##########################################################################################
 
-        int_splines = utils.intersectionSplines(splines, paths_final, single_nodes, img=source_img)
+        #ts = arrow.utcnow()
+        try:
+            int_splines = utils.intersectionSplines(splines, paths_final, single_nodes, img=source_img)
+        except:
+            int_splines = None
+        #cprint("time intersections splines: {0:.4f} ms".format((arrow.utcnow() - ts).total_seconds() * 1000), "yellow")
 
         colored_mask = utils.colorMasks(splines, shape=mask_img.shape, mask_input=None)
 
         if int_splines:
             # update with the score, if mask provided draw already the final mask
 
+            #ti = arrow.utcnow()
             int_splines = utils.intersectionScoresFromColor(int_splines, nodes, image=source_img, colored_mask=colored_mask)
+            #int_splines = utils.intersectionScoresFromColor(int_splines, nodes, image=source_img, colored_mask=None)
+            #cprint("time intersections scores with color mask: {0:.4f} ms".format((arrow.utcnow() - ti).total_seconds() * 1000), "yellow")
 
         ##########################################################################################
-
-
-        colored_mask[mask_img == 0] = (0, 0, 0)
-        return colored_mask
         
 
+        tot_time = (arrow.utcnow() - t0).total_seconds()*1000
+        times = {"tot_time": tot_time, "proc_time": pre_time, "skel_time": rv["time"]["skel"], "pred_time": pred_time}
+        #cprint("***** ALL PROCESSING TIME: {0:.4f} ms *****".format(tot_time), "yellow")
+
+
+        colored_mask[mask_img < mask_th] = (0, 0, 0)
+        return colored_mask, times
+        
 
     def solveIntersections(self, preds_sorted, nodes, vertices_dict, debug=False):
         nodes_done = []
@@ -260,7 +277,7 @@ class Pipeline():
     def predictAndMerge(self, graph_dict, vertices_dict, radii_dict, debug=False):
         t0 = arrow.utcnow()
 
-        data_network = PredictData.getAllPairs(graph_dict["nodes"], graph_dict["pred_edges_index"])
+        data_network = AriadnePredictData.getAllPairs(graph_dict["nodes"], graph_dict["pred_edges_index"])
 
         #print(data_network) 
 

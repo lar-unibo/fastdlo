@@ -1,12 +1,14 @@
 import os, pickle, cv2
+from numpy import int_
 from termcolor import cprint
 import arrow
+import numpy as np 
 
 import fastdlo.proc.utils as utils
 from fastdlo.proc.graphx import Graph
 from fastdlo.proc.skel import Processing
 
-
+import matplotlib.pyplot as plt
 
 class LabelsPred():
 
@@ -14,7 +16,7 @@ class LabelsPred():
         return self.graph.computeLocalPredictionEdgesExcluded(int_excluded_dict)
 
 
-    def compute(self, mask_img, source_img, mask_threshold=127, timings=True):
+    def compute(self, mask_img, source_img, mask_threshold=127, density=7, timings=True):
 
 
         t0 = arrow.utcnow()
@@ -22,24 +24,33 @@ class LabelsPred():
         mask = mask_img.copy()
         mask[mask_img <= mask_threshold] = 0
         mask[mask_img > mask_threshold] = 1
-        skel = Processing(mask, drop_endpoints=True)    
+        skel = Processing(mask, density=density, drop_endpoints=True)    
         paths = skel.paths
         int_points_dict = skel.int_points
+        dist_img = skel.dist_img
+
         
+        if False:
+            canvas = mask_img.copy()
+            canvas = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
+            plt.imshow(canvas)
+            for k, p in skel.paths.items():
+                plt.plot(p[:,1], p[:,0], label=str(k))
+            plt.legend()
+            plt.show()
+
+
         skel_time = (arrow.utcnow() - t0).total_seconds() * 1000
         if timings: cprint("skel time: {0:.4f}".format(skel_time), "yellow")
 
 
         t1 = arrow.utcnow()
         # discretize skeleton
-        vertices_dict, edges_dict, excluded_paths = utils.samplePaths(paths, density=10)
+        vertices_dict, edges_dict, excluded_paths = utils.samplePaths(paths, density=density)
+
+
         if timings: cprint("discretize time: {0:.4f}".format((arrow.utcnow() - t1).total_seconds() * 1000), "yellow")
         
-        t12 = arrow.utcnow()
-        # distance image
-        dist_img = cv2.distanceTransform(mask, cv2.DIST_L2, 3)
-        if timings: cprint("distance image time: {0:.4f}".format((arrow.utcnow() - t12).total_seconds() * 1000), "yellow")
-
 
         t2 = arrow.utcnow()
         # attributes

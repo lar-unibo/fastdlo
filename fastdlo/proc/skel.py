@@ -2,15 +2,19 @@ import numpy as np
 import cv2
 from skimage.morphology import skeletonize
 import arrow
+import scipy.spatial.distance
+import matplotlib.pyplot as plt 
 
 class Processing():
 
-    def __init__(self, mask, drop_endpoints=False, show_output=False):
+    def __init__(self, mask, density=10, drop_endpoints=False, show_output=False):
 
         self.drop_endpoints = drop_endpoints
         self.kernel_size = 3
         
         skeleton = skeletonize(mask, method="lee")
+
+        dist_img = cv2.distanceTransform(mask, cv2.DIST_L2, 3)
 
         # black out borders
         skeleton[:self.kernel_size, :] = 0
@@ -34,14 +38,25 @@ class Processing():
         #self.showLabelsCC(labels_im)
 
         int_points_f = self.associateLabelsToIntersections(labels_im, int_points_f)
+
+        if True and len(int_points_f) > 0:
+            points = [v["point"] for v in list(int_points_f.values())]
+            int_points_f_values = np.array(points).astype(int)
+            dist_int_values = dist_img[int_points_f_values[:,0], int_points_f_values[:,1]]
+            for i, pos in enumerate(int_points_f_values):
+                cv2.circle(skeleton_f, tuple([pos[1], pos[0]]), int(dist_int_values[i]), 0, -1)
+
         #print("int_points_f: \n", int_points_f)
 
         paths = self.pathsFromCC(num_labels, labels_im, skeleton_f)
+
+        int_points_f = self.simplifyIntersectionsDistImg(paths, int_points_f, dist_img)
         
         #print("Processing done!")
 
         self.paths = paths
         self.int_points = int_points_f
+        self.dist_img = dist_img
 
         if show_output:
             cv2.namedWindow('skeleton', 0)
@@ -51,6 +66,41 @@ class Processing():
             cv2.waitKey()
 
 
+    def simplifyIntersectionsDistImg(self, paths, int_points, dist_img):
+        if len(int_points) == 0:
+            return int_points
+
+        segmentsw = [v["segments"] for k,v in int_points.items()]
+        segments = [item for sublist in segmentsw for item in sublist]
+        segments = np.unique(segments)
+        path_keys = list(paths.keys())
+        diff = set(segments).difference(set(path_keys))
+
+        to_delete = []
+        new_int_points = {}
+        for dkey in diff:
+            new_segments = []
+            x, y = [], []
+            keys_to_delete = []
+            for k,v in int_points.items():
+                if dkey in v["segments"]:
+                    new_segments.extend(v["segments"])
+                    x.append(v["point"][0])
+                    y.append(v["point"][1])
+                    keys_to_delete.append(k)
+            
+            segments = np.unique(new_segments)
+            segments = [s for s in segments if s != dkey]
+            point = tuple([np.mean(x), np.mean(y)])
+            new_int_points[keys_to_delete[0]] = {"point": point, "segments": segments}
+            to_delete.extend(keys_to_delete)
+
+        for d in to_delete:
+            if d in int_points:
+                del int_points[d]
+        new_int_points.update(int_points)
+
+        return new_int_points
 
     def simplifyIntersections(self, int_points, threshold):
         #print("intersection points raw: \n", int_points)
@@ -91,9 +141,9 @@ class Processing():
     def showLabelsCC(self, labels):
 
         unique_labels = np.unique(labels)
-        print(unique_labels)
+        #print(unique_labels)
         for l in unique_labels:
-            print(l)
+            #print(l)
             mask = np.zeros_like(labels)
             mask[labels == l] = 255
             mask = mask.astype(np.uint8)
