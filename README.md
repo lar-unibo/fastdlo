@@ -1,6 +1,6 @@
 
 <div align="center">
-<h2> Fast Deformable Linear Objects Instance Segmentation and Modelling </h2>
+<h2> FASTDLO: Fast Deformable Linear Objects Instance Segmentation </h2>
 </div>
 
 ### Abstract
