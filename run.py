@@ -1,14 +1,11 @@
-import os, sys, cv2, arrow
-import numpy as np
-from termcolor import cprint
-
+import os, cv2
 from fastdlo.core import Pipeline
 
 
 if __name__ == "__main__":
 
     ######################
-    IMG_PATH = "/home/lar/Documents/fast_dlo_segmentation/images/c1_9.jpg"
+    IMG_PATH = "xxx"
     ckpt_siam_name = "CP_similarity.pth"
     ckpt_seg_name = "CP_segmentation.pth"
     IMG_W = 640

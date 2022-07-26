@@ -1,8 +1,6 @@
-import os, sys, cv2, itertools
+import itertools
 import numpy as np
 import arrow
-import matplotlib.pyplot as plt
-from termcolor import cprint 
 
 from fastdlo.siam_net.nn_predict import NN
 from fastdlo.seg_net.predict import SegNet
