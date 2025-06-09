@@ -33,7 +33,7 @@ pip install .
 
 ### Models' weights
 
-Download the [weights](https://drive.google.com/file/d/1OVcro53E_8oJxRPHqGy619rBNoCD3rzT/view?usp=sharing) and place them inside a ```weights``` folder.
+Download the [weights](https://mega.nz/file/YNsmnYwa#y9DiZEly-MQ_s8vHifSCDZLghaOe89pd4tZKQ5IOEME) and place them inside a ```weights``` folder.
 
 
 ### Usage
